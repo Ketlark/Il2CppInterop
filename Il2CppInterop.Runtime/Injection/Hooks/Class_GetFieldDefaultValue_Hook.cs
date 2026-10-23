@@ -148,7 +148,7 @@ namespace Il2CppInterop.Runtime.Injection.Hooks
 
         /// <summary>
         /// The target of the only direct call in <paramref name="function"/> (up to its first return) whose second
-        /// System V argument (rsi) was just set to the address of a stack slot; 0 if there is none or more than one.
+        /// System V argument (rsi) was just set to the address of a stack slot (lea or mov from rsp/rbp); 0 if there is none or more than one.
         /// </summary>
         private static nint FindCallWithStackAddressInSecondArgument(nint function)
         {
@@ -175,6 +175,12 @@ namespace Il2CppInterop.Runtime.Injection.Hooks
                 else if (instruction.Mnemonic == Mnemonic.Lea && instruction.Op0Register == Register.RSI)
                 {
                     secondArgumentIsStackAddress = instruction.MemoryBase is Register.RSP or Register.RBP;
+                }
+                else if (instruction.Mnemonic == Mnemonic.Mov && instruction.Op0Register == Register.RSI &&
+                         instruction.Op1Kind == OpKind.Register && instruction.Op1Register is Register.RSP or Register.RBP)
+                {
+                    // Some clang builds (seen on Linux, Unity 6000.0) pass the address of the slot at [rsp] as "mov rsi, rsp".
+                    secondArgumentIsStackAddress = true;
                 }
                 else if (instruction.FlowControl != FlowControl.Next ||
                          (instruction.Op0Kind == OpKind.Register && instruction.Op0Register.GetFullRegister() == Register.RSI))
